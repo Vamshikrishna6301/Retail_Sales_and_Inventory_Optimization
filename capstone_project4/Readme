@@ -1,0 +1,1447 @@
+Retail Sales & Inventory Optimization – Complete Project Review (Day 1 to Day 4)
+Before we start Day 5, let's document everything we've built so far, including the actual notebooks, data flow, data-quality decisions, issues, fixes, validations, workflow configuration and the reasoning behind each step.
+
+I've reviewed the project handbook, the uploaded notebook files and the project details available from our earlier conversations. I'll use the actual names and results rather than inventing a generic retail pipeline.
+
+One important distinction: where I have the notebook contents or a result you shared, I'll describe it as confirmed. Where we discussed a step but don't have its final execution output, I'll identify that rather than pretending it was verified.
+
+1. What is the project?
+Retail Sales and Inventory Optimization
+Days 1–4 implementation completed
+
+
+
+
+
+
+
+medium.com
+
+
+Business objective
+
+Build a data engineering pipeline that integrates retail sales transactions, inventory movements, sales returns and master/reference data, cleans and validates the records, and creates business-ready analytical tables for reporting and decision-making.
+
+This is not simply a CSV-to-Delta conversion project.
+
+The project simulates a retail organization's data landscape, where different business processes generate data independently:
+- Sales systems generate order-line transactions.
+- Inventory systems generate stock movement events.
+- Returns systems generate return and refund transactions.
+- Master-data systems maintain products, stores and suppliers.
+Our responsibility is to bring these different sources into one governed data platform, maintain data quality, preserve rejected records, create analytical models and prove that the pipeline can run repeatedly.
+The architecture we implemented
+Source systems
+
+ADLS Gen2 CSV feeds + Azure SQL master tables
+
+
+Bronze layer – Raw ingestion
+
+Auto Loader + JDBC → Delta tables
+
+
+Silver layer – Data cleaning
+
+Type casting, deduplication, validation, quarantine and relationship checks
+
+
+Gold layer – Business modelling
+
+Dimensions, facts, inventory ledger, daily sales summary and store KPIs
+
+
+Consumption layer
+
+Databricks AI/BI dashboard, UAT and business reporting – Day 5
+
+
+Supporting the entire architecture:
+- Unity Catalog for governance.
+- Delta Lake for reliable table storage.
+- Git integration for version control.
+- Databricks Workflows for orchestration.
+- Automated tests and audit evidence.
+- Performance and access-control checks.
+This follows the architecture proposed by the project handbook. 
+04_Retail_Dataset_Handbook(1).docx
+
+
+2. Source data – what exactly did we receive?
+Our project uses the catalog:
+capretailnew
+
+
+
+The three schemas are:
+capretailnew.bronze
+capretailnew.silver
+capretailnew.gold
+
+
+Our Volume root is:
+/Volumes/capretailnew/retail/ext_retail_vol/
+
+
+2.1 Six source datasets
+We worked with six datasets in total.
+Dataset	Classification	Source method	Business key	Raw rows
+Sales order lines	Transaction	ADLS / Auto Loader	order_line_id	11,412
+Inventory movements	Event	ADLS / Auto Loader	movement_id	634
+Sales returns	Transaction	ADLS / Auto Loader	return_id	316
+Product master	Master	Azure SQL seed data	product_id	139
+Store master	Master	Azure SQL seed data	store_id	148
+Supplier master	Master	Azure SQL seed data	supplier_id	157
+
+Total source records
+12,806
+
+The important part is that these datasets have different business grains.
+What is grain, and why did it matter?
+Grain means what one row represents.
+- Sales: one row represents one order line, not necessarily one complete customer order.
+- Inventory: one row represents one inventory movement event.
+- Returns: one row represents one return transaction.
+- Product: one row represents one product.
+- Store: one row represents one store.
+- Supplier: one row represents one supplier.
+We used these grains to decide the primary keys, deduplication logic, joins and fact-table design.
+Important source columns
+Sales order lines
+
+order_line_id, order_id, order_ts, store_id, product_id, customer_id, quantity, unit_price, discount_pct, sales_channel, order_status, tax_amount.
+
+Inventory movements
+
+movement_id, product_id, store_id, movement_ts, movement_type, quantity_change, reference_id, unit_cost, warehouse_id, recorded_ts.
+
+Sales returns
+
+return_id, order_line_id, return_ts, return_quantity, refund_amount, return_reason, inspection_status, store_id, product_id, approved_flag.
+
+Product master
+
+product_id, sku, product_name, category, subcategory, unit_of_measure, list_price, cost_price, supplier_id, active_flag.
+
+Store master
+
+store_id, store_name, city, region, store_type, opening_date, active_flag, warehouse_id, manager_code, country.
+
+Supplier master
+
+supplier_id, supplier_name, country, lead_time_days, payment_terms, active_flag, supplier_tier, city, category, contact_code.
+04_Retail_Dataset_Handbook(1).docx
+
+3. Day 1 – Understanding the project, profiling and Bronze ingestion
+Day 1 completed
+The first day was about understanding the source systems and getting raw data into Databricks.
+
+We did not immediately start cleaning the data. First, we needed to understand what the sources contained and what the expected business rules should be.
+3.1 Source data profiling
+Notebook: source_data_profiling (2).ipynb
+
+This notebook was used to investigate the source datasets before ingestion and transformation.
+Why did we need this notebook?
+Imagine receiving 11,412 sales records without knowing:
+- Whether the primary key is unique.
+- Whether numeric columns contain invalid values.
+- Whether some records are duplicated.
+- Whether required columns contain NULL values.
+- Whether the product and store references exist.
+- Whether timestamps are valid.
+If we start building Silver transformations without understanding these issues, we may accidentally remove valid business data or retain invalid data.
+
+So profiling was the foundation for our transformation decisions.
+What we investigated
+1. Source record counts.
+2. Column names and schemas.
+3. NULL values.
+4. Duplicate business keys.
+5. Exact duplicate records.
+6. Numeric values and unusual extremes.
+7. Category distributions.
+8. Foreign-key relationships.
+9. Timestamp and chronology patterns.
+Sales profiling findings
+Sales contained the most significant quality issues.
+Issue	Observed records
+Raw records	11,412
+Duplicate key groups	39
+Records involved in duplicate groups	78
+Missing quantity	3
+Invalid quantity = -999	20
+Missing unit_price	2
+Invalid unit_price = 999999.99	24
+Missing discount_pct	2
+Missing order_id	2
+Missing customer_id	1
+Missing sales_channel	3
+Missing order_status	1
+
+The distinction between duplicate groups and duplicate records is important:
+- There were 39 duplicate groups.
+- Each group involved two copies of a business key.
+- We kept one deterministic record per key and audited the replayed copies.
+Why was -999 important?
+A quantity of -999 is an unusual sentinel-like value, not a realistic sales quantity in this dataset.
+
+If we included it in sales calculations, it could distort:
+- Total quantity sold.
+- Sales revenue.
+- Average order-line quantity.
+- Product performance.
+Similarly, 999999.99 was an extreme unit price and needed to be treated as invalid rather than as a genuine retail price.
+Inventory and returns profiling
+Inventory:
+- 634 records.
+- 634 distinct movement IDs.
+- No duplicate movement IDs identified.
+- Signed quantity changes were present.
+Returns:
+- 316 records.
+- 316 distinct return IDs.
+- Parent sales references needed to be investigated.
+- Chronological relationships needed to be checked.
+The master data had 139 products, 148 stores and 157 suppliers.
+3.2 Bronze ingestion
+Notebook: bronze_ingestion (1).ipynb
+
+This is an important detail: we used one Bronze notebook for all three ADLS feeds, not three separate Bronze notebooks.
+Why did we use Auto Loader?
+Auto Loader is Databricks' incremental file-ingestion mechanism.
+
+Instead of manually reading every CSV file each time, Auto Loader discovers new files and processes them using streaming ingestion.
+
+We configured:
+- CSV format.
+- Header enabled.
+- Schema tracking.
+- Schema evolution using addNewColumns.
+- Checkpoint locations.
+- Delta as the Bronze output format.
+The notebook uses this Volume structure:
+/Volumes/capretailnew/retail/ext_retail_vol/
+
+    sales_order_lines/
+    inventory_movements/
+    sales_returns/
+
+    checkpoints/
+    schema_tracking/
+
+
+How our Auto Loader function worked
+The notebook defined a reusable function:
+ingest_with_autoloader(    source_path,    table_name,    checkpoint_name,    schema_name)
+
+
+
+Instead of repeating the same ingestion code three times, we passed the source path and destination table for each feed.
+
+The core read logic was:
+spark.readStream \    .format("cloudFiles") \    .option("cloudFiles.format", "csv") \    .option("cloudFiles.schemaLocation", schema_path) \    .option("cloudFiles.schemaEvolutionMode", "addNewColumns") \    .option("cloudFiles.inferColumnTypes", "false") \    .option("header", "true") \    .load(source_path)
+
+
+
+Why did we set inferColumnTypes to false?
+We wanted the raw Bronze ingestion to preserve the source values rather than make assumptions about business data types during ingestion.
+
+For example, a field containing -999 or 999999.99 should be preserved as raw source evidence. Silver is where we apply controlled casting and validation.
+Why did we add metadata columns?
+We added:
+- source_file
+- ingestion_timestamp
+These are important for traceability.
+
+Suppose a record is found to be invalid. We can investigate which source file it came from and when it was ingested.
+
+We also retained _rescued_data where applicable for schema or parsing issues.
+Why are checkpoints important?
+Auto Loader uses checkpoints to remember which files or stream progress have already been processed.
+
+Without a stable checkpoint, rerunning ingestion could reprocess previously handled files.
+
+We therefore maintained separate checkpoint paths for the three feeds.
+Bronze output tables
+capretailnew.bronze.bronze_sales_order_lines
+capretailnew.bronze.bronze_inventory_movements
+capretailnew.bronze.bronze_sales_returns
+
+
+The ingestion notebook is designed around raw evidence preservation, not business cleaning.
+Bronze counts
+Bronze table	Records
+bronze_sales_order_lines	11,412
+bronze_inventory_movements	634
+bronze_sales_returns	316
+
+3.3 Azure SQL master ingestion
+Notebook: JDBC_connection (1).ipynb
+
+This notebook handled the three master datasets.
+
+The handbook specifically identifies the master data as Azure SQL seed data. It should not be represented as though we directly loaded those CSV files into Bronze instead of using the Azure SQL source. 
+04_Retail_Dataset_Handbook(1).docx
+
+Why did we use JDBC?
+JDBC allows Spark to connect to a relational database and read its tables.
+
+We used it for:
+- dbo.product_master
+- dbo.store_master
+- dbo.supplier_master
+The general pattern was:
+spark.read \    .format("jdbc") \    .option("url", jdbc_url) \    .option("dbtable", "dbo.product_master") \    .option("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver") \    .load()
+
+
+
+We repeated the extraction for the other two master tables.
+
+The extracted DataFrames were written into Bronze Delta tables.
+Why did we separate this from Auto Loader?
+Because these sources are different:
+ADLS feeds	Azure SQL masters
+File-based	Database tables
+Auto Loader	JDBC
+Incremental file discovery	Database table extraction
+Checkpoint and schema tracking	Database connection configuration
+
+We used the appropriate ingestion method for each source.
+Bronze master tables
+capretailnew.bronze.bronze_product_master
+capretailnew.bronze.bronze_store_master
+capretailnew.bronze.bronze_supplier_master
+
+
+Counts:
+- Product: 139
+- Store: 148
+- Supplier: 157
+A security issue we need to record
+During notebook inspection, the JDBC notebook contained a database credential directly in notebook code. I will not reproduce it here.
+
+That is not the recommended production approach. The handbook explicitly calls for approved secret management. Before a production handoff, replace hardcoded credentials with Databricks secrets or the approved credential-management method, and rotate any exposed credential if it is real. 
+04_Retail_Dataset_Handbook(1).docx
+
+3.4 Day 1 output
+By the end of Day 1, we had:
+- Understood the source datasets and their grains.
+- Profiled the raw data.
+- Identified the sales data-quality issues.
+- Ingested three ADLS feeds using Auto Loader.
+- Ingested three master tables using JDBC.
+- Created six Bronze Delta tables.
+- Preserved source-file and ingestion metadata.
+Day 1's main achievement: All six datasets were available in Bronze, with the source issues understood well enough to design Silver processing.
+
+4. Day 2 – Silver layer: cleaning, validation and quarantine
+Day 2 completed
+Day 2 was arguably the most important data-quality day.
+
+Bronze preserved the source records. Silver was responsible for turning those raw records into usable, typed, validated datasets without silently losing information.
+
+Our Silver layer did not apply exactly the same rules to every dataset. Each dataset had different business requirements.
+4.1 Why did we create a separate Silver notebook for each data domain?
+We used four Silver notebooks because the datasets have different validation requirements.
+Actual notebook	Purpose
+Silver_Layer_Implementatio.ipynb	Sales cleansing and quarantine
+Inventory Movements Silver..ipynb	Inventory event validation
+Sales Returns Silver.ipynb	Returns validation and parent linkage
+master_tables_silver.ipynb	Product, store and supplier cleansing
+
+This separation made the pipeline easier to understand and allowed the Workflows job to execute independent processing tasks in parallel.
+
+We also configured the catalog and schema references explicitly, so the notebooks read from capretailnew.bronze and write to capretailnew.silver.
+4.2 Sales Silver – the most complex transformation
+Notebook: Silver_Layer_Implementatio.ipynb
+
+This notebook handled the sales data-quality issues identified on Day 1.
+Step 1: Read Bronze sales
+We read:
+capretailnew.bronze.bronze_sales_order_lines
+
+
+The Bronze sales table had 11,412 rows and 15 columns, including the raw business columns and ingestion metadata.
+Step 2: Type casting
+In Bronze, most source fields were retained as strings.
+
+In Silver, we converted fields into suitable types:
+Column	Silver type
+order_line_id	String
+order_id	String
+order_ts	Timestamp
+store_id	String
+product_id	String
+customer_id	String
+quantity	Numeric/integer
+unit_price	Numeric/decimal
+discount_pct	Numeric/decimal
+sales_channel	String
+order_status	String
+tax_amount	Numeric/decimal
+
+Why?
+
+Because calculations and comparisons must operate on appropriate data types.
+
+For example, if quantity remains a string, numeric aggregation and validation are not reliable.
+Step 3: Handle duplicate sales records
+We discovered 39 duplicate business-key groups.
+
+We did not simply delete every record that appeared more than once.
+
+Instead, the logic was:
+1. Identify duplicate order_line_id values.
+2. Select one deterministic representative record.
+3. Retain that record in the clean sales dataset.
+4. Capture the duplicate/replay evidence in a separate audit table.
+The audit table was:
+capretailnew.silver.sales_order_lines_duplicate_audit
+
+
+Why was this important?
+
+A repeated sales line might be a duplicate delivery or replay, not a second legitimate sale.
+
+If both copies were included in Gold, revenue and quantities could be double-counted.
+
+The audit table preserves evidence of what was removed from the clean dataset.
+Step 4: Identify hard-invalid records
+We classified the following as hard-invalid:
+- Missing quantity.
+- quantity = -999.
+- Missing unit_price.
+- unit_price = 999999.99.
+- Missing discount_pct.
+- Missing order_id.
+These records were not suitable for reliable sales calculations.
+
+We separated them into quarantine rather than allowing them into the clean sales fact.
+Step 5: Handle missing optional attributes
+Some records had missing customer, sales channel or order status.
+
+We had to distinguish missing optional attributes from records that could not safely enter the business fact.
+
+This is where our implementation changed.
+
+Initially, we retained the missing-order-status record with a data-quality flag. We then reconsidered the business requirement and decided that the clean sales table should not contain a missing order_status.
+
+We updated the transformation to quarantine that entire record as well.
+
+Final decision: remove the missing-order-status row from Silver Sales and retain it in quarantine.
+
+This was an important correction because an earlier intermediate output showed 11,320 clean records and 53 quarantined records. After the additional order-status rule, the final result became 11,319 clean records and 54 quarantined records.
+Final sales reconciliation
+11,319
+Clean Silver Sales records
+
+Raw Bronze Sales
+
+11,412
+
+Quarantined records
+
+54
+
+Duplicate excess records audited
+
+39
+
+
+Reconciled total
+11,412
+
+11,319 + 54 + 39 = 11,412
+
+Final Sales Silver table:
+capretailnew.silver.silver_sales_order_lines
+
+
+Quarantine:
+capretailnew.silver.quarantine_sales_order_lines
+
+
+Duplicate audit:
+capretailnew.silver.sales_order_lines_duplicate_audit
+
+
+The key lesson: quarantine is not the same as deletion. We kept invalid records available for investigation while excluding them from clean analytical data.
+4.3 Inventory Movements Silver
+Notebook: Inventory Movements Silver..ipynb
+
+This notebook handled the inventory event feed.
+Step 1: Read Bronze inventory
+capretailnew.bronze.bronze_inventory_movements
+
+
+Initial profiling showed:
+- Total records: 634
+- Distinct movement_id: 634
+So we did not have a duplicate movement-key problem.
+Step 2: Type casting and validation
+We converted the timestamp and numeric columns into suitable types and checked the event data.
+
+The key columns were:
+- movement_id
+- product_id
+- store_id
+- movement_ts
+- movement_type
+- quantity_change
+- reference_id
+- unit_cost
+- warehouse_id
+- recorded_ts
+Step 3: Preserve signed quantity changes
+This was an important business decision.
+
+The source contained both positive and negative quantity_change values.
+
+For example, a sale may decrease inventory, whereas a receipt may increase it.
+
+We did not blindly convert all movement quantities to positive numbers.
+
+Why?
+
+Because the sign represents the direction of the stock movement. Removing that sign would destroy information needed to calculate net inventory movement.
+
+We also did not invent an adjustment rule for the source data. The sign convention needs to follow the actual business definition of each movement type.
+Final Inventory Silver
+capretailnew.silver.silver_inventory_movements
+
+
+Metric	Result
+Bronze rows	634
+Silver rows	634
+Distinct movement IDs	634
+Quarantined rows	0
+
+Supporting table:
+capretailnew.silver.quarantine_inventory_movements
+
+
+It contained no rejected rows in our final result.
+4.4 Sales Returns Silver
+Notebook: Sales Returns Silver.ipynb
+
+This notebook handled the supplementary return transactions.
+Step 1: Read Bronze returns
+capretailnew.bronze.bronze_sales_returns
+
+
+Initial profiling:
+- 316 records.
+- 316 distinct return_id values.
+Step 2: Cast and validate return data
+We validated the return identifiers, timestamps, quantities, refund amounts and reference fields.
+
+The most important relationship was:
+sales_returns.order_line_id
+          |
+          v
+sales_order_lines.order_line_id
+
+
+A return is related to an original sales order line.
+
+We needed to establish whether that parent sales line existed in our clean Sales Silver dataset.
+Step 3: Investigate unmatched returns
+We found three returns whose parent sales lines were quarantined.
+
+The exact cases were:
+Return ID	Parent order-line ID
+RETURN040000032	ORDER_L040000929
+RETURN040000078	ORDER_L040002263
+RETURN040000106	ORDER_L040003075
+
+These are not necessarily invalid returns.
+
+The return record itself can be valid even if its parent sales record was rejected by the Sales Silver rules.
+
+Therefore, we retained the returns and made their linkage status explicit in Gold.
+Step 4: Investigate return-before-order timestamps
+We also identified 313 returns where return_ts was earlier than the original sales order timestamp.
+
+This was a chronology issue.
+
+We chose not to:
+- Change the timestamps.
+- Delete the returns.
+- Assume the return timestamp was wrong.
+Instead, we preserved the original evidence and flagged the chronology condition using return_before_order.
+
+Why?
+
+Because data engineering should not silently invent business facts to make records appear valid.
+
+The business owner would need to confirm whether these timestamps are incorrect or represent a source-system issue.
+Final Returns Silver
+capretailnew.silver.silver_sales_returns
+
+
+Metric	Result
+Bronze returns	316
+Silver returns	316
+Distinct return IDs	316
+Quarantined returns	0
+
+Supporting table:
+capretailnew.silver.quarantine_sales_returns
+
+
+No returns were rejected based on their intrinsic data-quality checks.
+
+The three parent-linkage cases were carried forward for explicit handling in Gold.
+4.5 Master Tables Silver
+Notebook: master_tables_silver.ipynb
+
+This notebook handled the three master datasets.
+
+We read:
+capretailnew.bronze.bronze_product_master
+capretailnew.bronze.bronze_store_master
+capretailnew.bronze.bronze_supplier_master
+
+
+We applied appropriate data-type handling and key validation.
+
+The resulting tables were:
+capretailnew.silver.silver_product_master
+capretailnew.silver.silver_store_master
+capretailnew.silver.silver_supplier_master
+
+
+Final results:
+Master table	Records
+Product	139
+Store	148
+Supplier	157
+
+The primary keys were non-null and unique in the final validated datasets.
+4.6 Foreign-key validation
+We also needed to make sure business references were valid.
+
+For example:
+- Does every Sales product_id exist in Product?
+- Does every Sales store_id exist in Store?
+- Does every Product supplier_id exist in Supplier?
+- Do Returns and Inventory refer to valid Products and Stores?
+We performed relationship checks between the Silver datasets.
+
+The final checks showed no unmatched product/store references in the validated relationships.
+
+This was essential before building Gold facts, because invalid foreign keys could produce missing dimension relationships and incomplete reports.
+4.7 Day 2 final Silver inventory
+Silver table	Final rows
+silver_sales_order_lines	11,319
+silver_inventory_movements	634
+silver_sales_returns	316
+silver_product_master	139
+silver_store_master	148
+silver_supplier_master	157
+
+Supporting audit and quarantine tables:
+Table	Purpose
+quarantine_sales_order_lines	Invalid sales records
+sales_order_lines_duplicate_audit	Duplicate sales evidence
+quarantine_inventory_movements	Rejected inventory events
+quarantine_sales_returns	Rejected return records
+
+Day 2's main achievement: We converted raw Bronze data into validated Silver entities, documented rejected records, preserved duplicate evidence and handled difficult parent/chronology cases without silently changing the source.
+
+5. Day 3 – Gold layer and business-ready modelling
+Day 3 completed
+Day 3 was about creating business-ready data.
+
+Silver contains cleaned entity-level data. Gold combines it into facts, dimensions, ledgers and aggregated business summaries.
+
+We used three notebooks for Gold.
+Actual notebook	Responsibility
+retail_gold_layer_dim (1).ipynb	Gold dimensions
+gold_layer_fact (1).ipynb	Gold facts
+gold_layer_business (1).ipynb	Inventory ledger and business summaries
+
+5.1 Why did we create dimension tables?
+Dimension tables describe business entities.
+
+For example, a Sales Fact can contain a product_id, but the business dashboard also needs the product name, category and subcategory.
+
+Instead of repeating every product attribute in every fact row, we maintain a Product Dimension.
+Gold dimension tables
+capretailnew.gold.gold_dim_product
+capretailnew.gold.gold_dim_store
+capretailnew.gold.gold_dim_supplier
+
+
+Dimension	Rows
+gold_dim_product	139
+gold_dim_store	148
+gold_dim_supplier	157
+
+Why did we use dimensions?
+They provide descriptive attributes for business reporting.
+
+For example:
+- Sales by product category.
+- Sales by store region.
+- Inventory by product.
+- Supplier-level analysis.
+5.2 Why did we create fact tables?
+Fact tables store measurable business events.
+
+We created three primary facts.
+A. Sales Fact
+capretailnew.gold.gold_fact_sales
+
+
+Grain:
+
+One row per clean sales order line.
+
+It contains the clean sales transactions and their business measures and dimension references.
+
+Final rows:
+11,319
+Important measures include the sales quantity, gross sales, discount and net sales before tax.
+B. Returns Fact
+capretailnew.gold.gold_fact_returns
+
+
+Grain:
+
+One row per return transaction.
+
+Final rows:
+
+316 return transactions
+
+We also retained the parent-linkage status so the three returns linked to quarantined sales were distinguishable from the other 313.
+
+The two statuses were:
+MATCHED_TO_CLEAN_SALES
+PARENT_SALES_QUARANTINED
+
+
+This is better than silently dropping those three returns.
+C. Inventory Movement Fact
+capretailnew.gold.gold_fact_inventory_movements
+
+
+Grain:
+
+One row per inventory movement event.
+
+Final rows:
+
+634 inventory movements
+
+This fact provides the foundation for movement-based stock analysis.
+5.3 Inventory movement ledger
+Notebook: gold_layer_business (1).ipynb
+
+This notebook also created:
+capretailnew.gold.gold_inventory_movement_ledger
+
+
+Why did we create a ledger?
+An inventory movement fact stores individual events. A ledger adds the ordered, cumulative view of those events.
+
+For example, suppose the movement history for one product at one location is:
+Movement	Quantity change	Cumulative movement
+Receipt	'+20	'+20
+Sale	'-5	'+15
+Transfer	'-3	'+12
+Adjustment	'+2	'+14
+
+The cumulative total is calculated using a window over the ordered movement history.
+
+We validated:
+- Movement sequence was populated.
+- Cumulative quantity was populated.
+- No missing sequence values.
+- No missing cumulative quantity values.
+Important interpretation
+The cumulative sum of quantity_change is the cumulative net movement.
+
+It is not automatically the actual on-hand stock unless we also know the opening stock balance and the unit-of-measure rules.
+
+That is why the handbook specifically calls out stock balance reconciliation and unit-of-measure controls. We should not claim those are fully established just because the ledger was created.
+5.4 Daily Sales Summary
+The same Gold business notebook created:
+capretailnew.gold.gold_daily_sales_summary
+
+
+Purpose:
+
+Aggregate Sales Fact measures at the daily reporting grain.
+
+Final rows:
+
+9,890
+
+We validated that the aggregated totals reconcile with the underlying Gold Sales Fact.
+
+The summary supports questions such as:
+- How much did the business sell each day?
+- How many order lines were recorded?
+- How many units were sold?
+- What was the daily discount amount?
+- What was the daily net sales amount?
+5.5 Store Sales KPIs
+The notebook also created:
+capretailnew.gold.gold_store_sales_kpis
+
+
+Final rows:
+
+148
+
+This provides store-level business metrics.
+
+It supports comparisons between stores and regions and can be used directly by the Day 5 dashboard.
+5.6 Gold validation – 57 checks
+We then ran a comprehensive validation notebook/cell covering 57 checks.
+
+The checks covered:
+1. Dimension row counts.
+2. Fact row counts.
+3. Primary-key nulls.
+4. Duplicate primary keys.
+5. Missing sales order status.
+6. Calculated sales fields.
+7. Foreign-key relationships.
+8. Silver-to-Gold reconciliation.
+9. Return parent-linkage status.
+10. Daily sales summary reconciliation.
+11. Store KPI reconciliation.
+12. Inventory ledger completeness.
+Final validated Gold table counts
+Gold table	Final rows
+gold_dim_product	139
+gold_dim_store	148
+gold_dim_supplier	157
+gold_fact_sales	11,319
+gold_fact_returns	316
+gold_fact_inventory_movements	634
+gold_inventory_movement_ledger	634
+gold_daily_sales_summary	9,890
+gold_store_sales_kpis	148
+
+Primary-key and foreign-key checks
+The final output confirmed:
+- Primary-key NULL counts: 0.
+- Duplicate primary-key groups: 0.
+- Missing Sales order_status: 0.
+- Calculated Sales fields with NULL values: 0.
+- Unmatched Sales Product/Store references: 0.
+- Unmatched Returns Product/Store references: 0.
+- Unmatched Inventory Product/Store references: 0.
+- Unmatched Product Supplier references: 0.
+Silver-to-Gold reconciliation
+Dataset	Silver	Gold	Difference
+Sales	11,319	11,319	0
+Returns	316	316	0
+Inventory	634	634	0
+
+Returns relationship validation
+Link status	Rows
+Matched to clean Sales	313
+Parent Sales quarantined	3
+Total	316
+
+Sales KPI reconciliation
+We also compared the aggregated Daily Sales Summary and Store Sales KPIs with the Gold Sales Fact.
+Measure	Gold Sales Fact total
+Order lines	11,319
+Quantity	56,327
+Gross sales	532,962,741.00
+Discount	79,684,195.64
+Net sales before tax	453,278,545.36
+
+Both aggregate tables reconciled to the Gold Sales Fact for the checked measures.
+57 / 57
+Gold validation checks passed
+Passed
+
+57
+
+Failed
+
+0
+
+
+
+
+Day 3's main achievement: We built the dimensional model, fact tables, inventory movement ledger and reporting aggregates, then demonstrated that the Gold data reconciled with Silver and that the business summaries matched the underlying sales facts.
+
+6. Day 4 – Production readiness and orchestration
+Day 4 completed
+Day 4 moved our project from a collection of working notebooks towards an orchestrated data pipeline.
+
+Until Day 3, we had implemented the data processing logic. On Day 4, we worked on making that logic repeatable, testable, maintainable and easier to operate.
+
+The handbook identifies six main Day 4 activities:
+1. Git integration and PR.
+2. Databricks Workflows.
+3. Automated tests.
+4. Failure and replay recovery.
+5. Performance benchmarking.
+6. Access controls.
+04_Retail_Dataset_Handbook(1).docx
+6.1 Git integration and PR
+We completed the Git integration/PR activity.
+Why did we need Git?
+Without version control, notebook changes can become difficult to track.
+
+Git helps us:
+- Maintain project versions.
+- Track code changes.
+- Review modifications.
+- Collaborate with team members.
+- Keep a record of changes before merging them.
+The purpose of a PR is to review changes before they become part of the shared project version.
+
+We marked this activity complete during Day 4.
+
+The exact repository name, branch names and PR number are not available in the project details I can currently verify, so I won't invent them.
+6.2 Databricks Workflows – pipeline orchestration
+This was one of the biggest Day 4 tasks.
+
+Before Workflows, we could run each notebook manually.
+
+But in a real data engineering pipeline, we need to execute notebooks in the correct order, wait for dependencies and stop downstream processing when upstream tasks fail.
+
+That is what Databricks Workflows provides.
+Workflow name
+Retail_Sales_Inventory_Pipeline
+
+
+We configured 10 tasks:
+- 9 core ingestion and transformation tasks.
+- 1 final validation task.
+Exact task-to-notebook mapping
+Workflow task	Actual notebook
+bronze_ingestion	bronze_ingestion (1).ipynb
+jdbc_ingestion	JDBC_connection (1).ipynb
+sales_silver	Silver_Layer_Implementatio.ipynb
+inventory_silver	Inventory Movements Silver..ipynb
+returns_silver	Sales Returns Silver.ipynb
+master_silver	master_tables_silver.ipynb
+gold_dimensions	retail_gold_layer_dim (1).ipynb
+gold_facts	gold_layer_fact (1).ipynb
+gold_business	gold_layer_business (1).ipynb
+gold_validation	Your final validation notebook
+
+A detail worth remembering: the Bronze task runs all three Auto Loader feeds in one notebook. We did not create separate Bronze tasks for Sales, Inventory and Returns.
+Why did we configure dependencies?
+The tasks cannot all run at the same time because some depend on data created by others.
+
+Our dependency structure was:
+bronze_ingestion
+
+jdbc_ingestion
+
+These two start independently and can execute in parallel.
+sales_silver
+
+
+master_silver
+
+
+inventory_silver
+
+
+returns_silver
+
+
+
+Sales, Inventory and Returns depend on Bronze ingestion. Master Silver depends on JDBC ingestion.
+gold_dimensions
+
+Depends on master_silver
+
+gold_facts
+
+Waits for all four Silver tasks and gold_dimensions
+
+gold_business
+
+Depends on gold_facts
+
+gold_validation
+
+Runs after gold_business
+
+
+Why can Bronze and JDBC run in parallel?
+They are independent source-ingestion processes.
+
+Bronze ingestion produces the transaction/event data.
+
+JDBC ingestion produces the master data.
+
+Neither needs the other's output to complete its initial ingestion.
+Why does Gold Facts wait for all Silver tasks?
+Gold facts need the cleaned transaction data and the corresponding dimensions.
+
+For example, Sales Fact uses Sales Silver and needs the relevant product and store dimensions.
+
+If a fact table starts before the necessary Silver or dimension tables are ready, it may fail or produce incomplete output.
+Why does Gold Validation run last?
+Because we want to validate the final business-ready tables only after all Gold transformations have finished.
+
+It acts as the final quality gate of the workflow.
+Successful workflow run
+You shared a screenshot showing that all tasks completed successfully.
+Successful workflow run
+4m 08s
+Total workflow execution time
+
+Previously shared successful run; individual tasks may run in parallel, so their durations should not be added to calculate elapsed workflow time.
+
+Approximate individual task durations from that run:
+Task	Duration
+bronze_ingestion	47.1 sec
+jdbc_ingestion	49 sec
+sales_silver	80 sec
+inventory_silver	26 sec
+returns_silver	39.5 sec
+master_silver	92 sec
+gold_dimensions	24.2 sec
+gold_facts	28.5 sec
+gold_business	29.7 sec
+gold_validation	23.2 sec
+
+One workflow configuration detail
+We also discussed a possible On all tables update of trigger.
+
+For the initial project demonstration, we preferred a controlled manual run instead of automatically triggering the pipeline whenever a table changes.
+
+I don't have confirmation of whether that trigger was ultimately removed, so it should be checked before the final handoff.
+6.3 Automated data-quality tests
+We already had the 57-check Gold validation logic.
+
+For Day 4, we worked on making the results more structured and persistently auditable.
+Why did we need automated testing?
+A notebook displaying successful results is useful, but a production pipeline also needs a record of what was tested and whether it passed.
+
+We wanted a test matrix containing:
+- Test ID.
+- Test description.
+- Actual result.
+- Expected result.
+- Test status.
+- Test execution timestamp.
+Test-results table
+We created or configured the test output to be written into:
+capretailnew.gold.gold_dq_test_results
+
+
+The structure was:
+Column	Meaning
+test_id	Unique identifier for the test
+test_description	What the test checks
+actual_result	Observed result
+expected_result	Required result
+test_status	PASS or FAIL
+test_execution_timestamp	When the test ran
+
+Why use Delta for test results?
+Because Delta allows us to store the test history in a queryable table.
+
+We can later run SQL such as:
+SELECT
+    test_status,
+    COUNT(*) AS test_count
+FROM capretailnew.gold.gold_dq_test_results
+GROUP BY test_status;
+
+
+We can also investigate which tests failed in a particular run.
+Important difference between overwrite and append
+For the business fact tables, our transformations use the intended rebuild/overwrite approach for the current dataset.
+
+For the test history, we use append mode so that each execution adds a new set of test results instead of erasing the earlier test history.
+
+That means repeated workflow executions can add another set of test records. This is intentional for a history table, provided the test-run identity is handled consistently.
+
+You confirmed that this automated testing step was implemented. I have the 57-check validation output, but not a separate final screenshot of the persisted test-results table, so that is still useful evidence to retain.
+6.4 Failure and recovery testing
+The next task was to demonstrate that we could handle a failed task without manually editing our transformation notebooks every time.
+
+This led to an important discussion.
+The initial approach
+We first discussed a notebook containing a hardcoded exception.
+
+That would simulate a failure, but it is not a good reusable approach because someone would need to edit the notebook to enable or disable the failure.
+
+You correctly questioned that.
+The improved approach – parameter-driven failure simulation
+We changed the approach to use a Databricks widget:
+# DAY 4 - FAILURE RECOVERY TESTdbutils.widgets.text("simulate_failure", "false")simulate_failure = dbutils.widgets.get("simulate_failure").lower()print("Failure simulation:", simulate_failure)if simulate_failure == "true":    raise Exception(        "Simulated transient failure for recovery testing"    )print("Notebook execution successful.")print("Recovery test completed.")
+
+
+
+Why is this better?
+Because the notebook code stays unchanged.
+
+We can control the behaviour using a task parameter.
+Parameter	Behaviour
+true	Intentionally throws a simulated exception
+false	Executes successfully
+
+This separates the test configuration from the notebook's actual code.
+Why is this not the same as fixing a real production error?
+Because this is a controlled fault-injection test.
+
+It demonstrates that the job can encounter a failure and that we can test recovery behaviour. It does not prove that every possible production failure is automatically repaired.
+
+We also discussed that a Repair Run may or may not let you change task parameters in the way you expect. We should not claim that it will always automatically replace the failed parameter.
+
+Status: The parameter-driven failure-test setup was completed. We subsequently completed the idempotent replay test. The exact failed-run and repaired-run output is not available in the evidence I can verify here, so I am not marking that separate recovery execution as independently proven.
+6.5 Idempotent replay test
+This was another important production-readiness check.
+
+You ran the replay test and confirmed:
+Idempotent replay passed
+What is idempotency?
+Idempotency means that running the same pipeline again with the same source data should not produce additional duplicate business records or change the expected final results.
+
+For example:
+- First execution: Sales Fact contains 11,319 rows.
+- Second execution with unchanged source data: Sales Fact should still contain 11,319 rows.
+It should not become 22,638.
+What did we do?
+We first captured baseline counts using SQL:
+SELECT 'Bronze Sales' AS table_name, COUNT(*) AS total
+FROM capretailnew.bronze.bronze_sales_order_lines
+
+UNION ALL
+
+SELECT 'Bronze Inventory', COUNT(*)
+FROM capretailnew.bronze.bronze_inventory_movements
+
+UNION ALL
+
+SELECT 'Bronze Returns', COUNT(*)
+FROM capretailnew.bronze.bronze_sales_returns
+
+UNION ALL
+
+SELECT 'Gold Sales Fact', COUNT(*)
+FROM capretailnew.gold.gold_fact_sales
+
+UNION ALL
+
+SELECT 'Gold Returns Fact', COUNT(*)
+FROM capretailnew.gold.gold_fact_returns
+
+UNION ALL
+
+SELECT 'Gold Inventory Fact', COUNT(*)
+FROM capretailnew.gold.gold_fact_inventory_movements;
+
+
+Expected counts:
+Table	Expected count
+Bronze Sales	11,412
+Bronze Inventory	634
+Bronze Returns	316
+Gold Sales Fact	11,319
+Gold Returns Fact	316
+Gold Inventory Fact	634
+
+Then we reran the main workflow:
+Retail_Sales_Inventory_Pipeline
+
+
+We did not delete the Auto Loader checkpoints or source files.
+
+Why?
+
+Because the checkpoint is part of how Auto Loader remembers which source files have already been processed.
+
+Deleting it would change the replay conditions and could cause previously processed files to be ingested again.
+What did we prove?
+The unchanged-input replay passed.
+
+That demonstrates that our pipeline, with its existing checkpoint and overwrite-based downstream table builds, can be run again without changing the expected business counts.
+
+Scope of this result: It proves unchanged-source replay behaviour. It does not, by itself, prove all possible late-arrival, update, correction or changed-file scenarios.
+6.6 Performance benchmarking
+We then moved to performance benchmarking.
+
+We created a notebook named:
+day4_performance_benchmark
+
+
+Why did we need this?
+In production, it is important to know:
+- Which task takes the longest.
+- Which stage could become a bottleneck.
+- How long the complete workflow takes.
+- Whether future optimizations improve execution time.
+We used the durations from our successful workflow run as the baseline.
+
+The notebook contained:
+task_performance = [    ("bronze_ingestion", 47.1),    ("jdbc_ingestion", 49.0),    ("sales_silver", 80.0),    ("inventory_silver", 26.0),    ("returns_silver", 39.5),    ("master_silver", 92.0),    ("gold_dimensions", 24.2),    ("gold_facts", 28.5),    ("gold_business", 29.7),    ("gold_validation", 23.2)]
+
+
+
+We created a DataFrame from the values and sorted tasks by execution duration.
+What did we identify?
+Rank	Task	Duration
+1	master_silver	92 sec
+2	sales_silver	80 sec
+3	jdbc_ingestion	49 sec
+
+These are the slowest tasks in the recorded run.
+
+We also calculated:
+- Total of the task durations.
+- Average task duration.
+- Maximum task duration.
+Remember: total task duration is not the same as workflow elapsed time because tasks can run in parallel.
+Important qualification
+This was a baseline performance report using observed task durations. It was not a controlled optimization experiment.
+
+We did not claim that we improved performance by a particular percentage or benchmarked different cluster configurations.
+
+That distinction matters when we present our results.
+6.7 Unity Catalog access-control review
+Finally, we inspected the permissions in Catalog Explorer.
+
+Our catalog:
+capretailnew
+
+
+Schemas:
+bronze
+silver
+gold
+
+
+You shared the permissions for these Data Training Users:
+- Data Training User 49
+- Data Training User 51
+- Data Training User 19
+- Data Training User 55
+- Data Training User 26
+Each showed permissions including:
+ALL PRIVILEGES
+EXTERNAL USE SCHEMA
+MANAGE
+READ METADATA
+
+
+You clarified that this is a team project, so those shared permissions are expected in your training environment.
+
+We then checked the Bronze schema and you confirmed that its permissions were the same.
+
+We decided not to revoke or modify those permissions.
+Why did we avoid changing them?
+Because this is a shared training environment.
+
+Removing permissions from other team members could break the project or prevent them from using the shared catalog.
+What did we actually establish?
+We inspected the catalog and schema permissions and documented the shared team access.
+
+We did not independently prove that the workspace enforces a production least-privilege model. The current permission set is broad, and the actual access policy should be reviewed by the workspace administrator before production deployment.
+
+That is the accurate way to describe the work.
+
+7. Complete notebook inventory – what each notebook does
+This is the actual notebook list we have been using. Keep this section because it is useful when someone asks you to explain your project architecture or why you separated the work into multiple notebooks.
+No.	Actual notebook name	Layer	Why we used it
+1	source_data_profiling (2).ipynb	Profiling	Investigate source data, identify defects, determine business keys and prepare cleaning rules
+2	bronze_ingestion (1).ipynb	Bronze	Ingest Sales, Inventory and Returns using Auto Loader
+3	JDBC_connection (1).ipynb	Bronze	Extract Product, Store and Supplier master tables from Azure SQL
+4	Silver_Layer_Implementatio.ipynb	Silver	Clean Sales, remove duplicates, cast columns and quarantine invalid records
+5	Inventory Movements Silver..ipynb	Silver	Validate inventory event data and preserve signed quantity changes
+6	Sales Returns Silver.ipynb	Silver	Clean return records, check parent sales linkage and identify chronology issues
+7	master_tables_silver.ipynb	Silver	Clean and validate Product, Store and Supplier masters
+8	retail_gold_layer_dim (1).ipynb	Gold	Create Product, Store and Supplier dimensions
+9	gold_layer_fact (1).ipynb	Gold	Create Sales, Returns and Inventory Movement facts
+10	gold_layer_business (1).ipynb	Gold	Create inventory ledger, daily sales summary and store KPIs
+11	Your Gold validation notebook	Validation	Execute the 57 validation checks and verify Gold outputs
+12	day4_performance_benchmark	Day 4	Record workflow task durations and identify slow tasks
+13	Day 4 failure/recovery test notebook	Day 4	Simulate a controlled task failure using a parameter
+
+The first 10 notebooks are the actual source notebooks we reviewed. The last three are supporting validation and operational notebooks; I do not have a verified filename for the Gold validation or failure-test notebook, so I have described them by their purpose rather than making up filenames.
+
+The notebook files themselves confirm the Bronze, JDBC, Sales Silver, Inventory Silver and Returns Silver implementations.     
+Why did we not put everything in one notebook?
+Because each stage has a separate responsibility.
+
+For example:
+- Profiling investigates the source.
+- Bronze ingests and preserves source data.
+- Silver cleans and validates it.
+- Gold models it for business analysis.
+- Validation checks the final outputs.
+- Workflows orchestrates the complete process.
+Separating these responsibilities makes it easier to debug a failure, rerun an individual stage, review code and understand the pipeline.
+
+8. The important issues we faced and how we resolved them
+This is one of the most valuable parts of the project. In an interview or client presentation, explaining the problem and why you chose a particular solution demonstrates much more understanding than just listing technologies.
+Problem or decision	What we did	Why
+Raw sales had duplicate order-line keys	Deterministic deduplication and duplicate audit	Avoid double-counting sales while preserving evidence
+Sales quantity had -999 values	Quarantined invalid records	Prevent unrealistic quantities from distorting KPIs
+Sales unit price had 999999.99 values	Quarantined invalid records	Prevent unrealistic revenue calculations
+Required sales attributes were missing	Applied hard-invalid and missing-status rules	Ensure Gold sales records are suitable for analysis
+Missing order status initially remained in Silver	Changed the rule and quarantined the entire record	Maintain a clean Sales Fact
+Returns referenced quarantined sales	Kept returns and recorded parent-link status	Preserve valid return evidence
+Return timestamps preceded order timestamps	Preserved timestamps and flagged chronology	Avoid inventing corrected business facts
+Inventory contained positive and negative quantities	Preserved signed quantity changes	Maintain movement direction
+Different source systems required different ingestion methods	Auto Loader for ADLS, JDBC for Azure SQL	Match ingestion to source type
+Re-running ingestion could duplicate data	Retained Auto Loader checkpoints and tested replay	Maintain repeatable ingestion
+Hardcoded failure simulation required editing notebooks	Switched to parameter-driven fault injection	Separate test control from notebook code
+Team permissions were broad	Inspected and documented them without revoking access	Avoid disrupting the shared environment
+
+Three particularly important engineering decisions
+A. Why quarantine instead of deleting records?
+Because rejected records still have business and audit value.
+
+If we simply delete an invalid sales record, we lose the ability to investigate why it was excluded.
+
+With quarantine, we preserve it separately and keep the clean Silver and Gold datasets reliable.
+B. Why did we retain the three unmatched returns?
+Because the return records were intrinsically valid. The problem was that their parent sales records had been quarantined.
+
+Deleting the returns would have hidden legitimate source activity. We instead represented their linkage condition explicitly.
+C. Why didn't we correct the return timestamps?
+Because we did not have a confirmed business rule establishing which timestamp was wrong.
+
+Changing source timestamps without evidence would create fabricated data.
+
+We preserved the original event and added a chronology flag.
+
+9. Final data architecture and table inventory
+Here is the table inventory we have established.
+Bronze – 6 tables
+capretailnew.bronze.bronze_sales_order_lines
+capretailnew.bronze.bronze_inventory_movements
+capretailnew.bronze.bronze_sales_returns
+
+capretailnew.bronze.bronze_product_master
+capretailnew.bronze.bronze_store_master
+capretailnew.bronze.bronze_supplier_master
+
+
+Silver – 6 main tables and 4 supporting tables
+capretailnew.silver.silver_sales_order_lines
+capretailnew.silver.silver_inventory_movements
+capretailnew.silver.silver_sales_returns
+
+capretailnew.silver.silver_product_master
+capretailnew.silver.silver_store_master
+capretailnew.silver.silver_supplier_master
+
+
+Supporting tables:
+capretailnew.silver.quarantine_sales_order_lines
+
+capretailnew.silver.sales_order_lines_duplicate_audit
+
+capretailnew.silver.quarantine_inventory_movements
+
+capretailnew.silver.quarantine_sales_returns
+
+
+Gold – 9 business tables and 1 test-results table
+capretailnew.gold.gold_dim_product
+capretailnew.gold.gold_dim_store
+capretailnew.gold.gold_dim_supplier
+
+capretailnew.gold.gold_fact_sales
+capretailnew.gold.gold_fact_returns
+capretailnew.gold.gold_fact_inventory_movements
+
+capretailnew.gold.gold_inventory_movement_ledger
+
+capretailnew.gold.gold_daily_sales_summary
+capretailnew.gold.gold_store_sales_kpis
+
+capretailnew.gold.gold_dq_test_results
+
+
+The inventory lists the six main Bronze tables, six main Silver tables, four Silver support tables, nine Gold business tables and the Gold test-results table.
+
+10. Where the project stands after Day 4
+This is the consolidated status.
+Area	Status	What we have
+Source understanding	Complete	Source inventory, grains and profiling
+Bronze ingestion	Complete	Three Auto Loader feeds and three JDBC master extracts
+Silver Sales	Complete	Deduplication, validation, quarantine and audit
+Silver Inventory	Complete	634 validated movement events
+Silver Returns	Complete	316 records and linkage/chronology handling
+Silver Masters	Complete	Three validated master datasets
+Gold dimensions	Complete	Three dimensions
+Gold facts	Complete	Three facts
+Inventory ledger	Complete	Cumulative movement ledger
+Business summaries	Complete	Daily Sales and Store KPIs
+Gold validation	Passed	57 checks, zero failures
+Git integration and PR	Completed	Git activity marked complete
+Databricks Workflows	Passed	10 tasks, successful run
+Automated test recording	Implemented	Structured Delta test-results output
+Failure simulation	Setup completed	Parameter-driven test
+Idempotent replay	Passed	Unchanged-source replay
+Performance benchmarking	Completed	Baseline task durations
+Access-control review	Inspected	Team permissions reviewed
+
+Evidence we should preserve
+Evidence	What it demonstrates
+Source inventory and EDA outputs	We understood the source data
+Bronze table counts	All six source datasets were ingested
+Silver DQ and quarantine outputs	We cleaned and audited records
+Silver-to-Gold reconciliation	Transformations preserved expected records
+57-check validation output	Gold data passed automated checks
+Gold table counts and KPI totals	Business outputs reconcile
+Git/PR screenshot	Version-control work
+Workflow DAG screenshot	Correct dependencies
+Successful workflow run	End-to-end orchestration
+Test-results table output	Automated test history
+Failure-test setup and run evidence	Fault-injection preparation and recovery testing
+Before/after replay counts	Idempotency evidence
+Performance benchmark outputs	Task-duration baseline
+Catalog and schema permission screenshots	Access-control review
+
+
+11. What remains to be careful about before final handoff
+I want to distinguish a completed implementation from a production-ready system. There are a few points worth keeping visible.
+1. Opening inventory and stock reconciliation: We built the movement ledger and validated its sequence and cumulative values. We still need to establish opening stock, business movement signs and units of measure before claiming actual on-hand stock is fully reconciled.
+2. Failure recovery evidence: The parameter-driven test notebook is prepared, and the replay test passed. The exact failed-run/repair-run result still needs a screenshot or execution record if we want to claim that full recovery scenario was demonstrated.
+3. Test history: We implemented the Delta test-results output. Retain the actual table output to prove the persistence step.
+4. Security: Shared team access is expected in the training environment, but the current permissions are broad. Production least-privilege access needs an administrator review.
+5. JDBC credentials: Replace any notebook-embedded credentials with approved secret management and rotate any real exposed credentials.
+6. Workflow trigger: Confirm whether the earlier automatic table-update trigger was removed, because we intended to use controlled manual execution during initial validation.
+7. Performance: We have a baseline, not a demonstrated optimization improvement.
+These aren't reasons to discard the work. They're the distinctions that make the final technical presentation accurate.
+
+12. How to explain the project in one continuous technical narrative
+Here is the story you should be able to tell without opening the notebooks:
+We developed a Retail Sales and Inventory Optimization data engineering pipeline using Azure Data Lake Storage, Azure SQL, Databricks, PySpark, Delta Lake and Unity Catalog.
+
+Initially, we profiled six datasets and identified the business grain and data-quality issues, particularly in the sales order-line feed. We ingested the three file-based feeds using Auto Loader and the three master datasets using JDBC, preserving raw data and ingestion metadata in Bronze.
+
+In Silver, we applied data-type casting, deterministic deduplication, validation and quarantine. We retained duplicate audit evidence, removed invalid sales records, validated master relationships, preserved inventory movement signs and handled returns with unmatched parents and chronology issues without changing the original business events.
+
+In Gold, we created three dimensions, three fact tables, an inventory movement ledger, a daily sales summary and store-level KPIs. We reconciled the facts and aggregates with Silver and completed 57 validation checks with zero failures.
+
+Finally, we integrated the notebooks with Git, orchestrated the end-to-end pipeline through Databricks Workflows, added structured test-result recording, prepared parameter-driven failure simulation, passed unchanged-input idempotent replay, recorded task-performance baselines and reviewed Unity Catalog permissions.
+
+
+My assessment
+You have already completed the core data engineering implementation: source ingestion, cleansing, business modelling, reconciliation and workflow orchestration.
+
+The most valuable part of this project is not simply that you used Auto Loader, JDBC, PySpark or Delta Lake. It is that you made explicit decisions about data quality and business meaning:
+- You did not double-count duplicate sales.
+- You did not treat invalid numeric values as genuine sales.
+- You did not silently discard returns with rejected parent sales.
+- You did not modify event timestamps without business evidence.
+- You preserved signed inventory movements.
+- You validated business aggregates against their source facts.
+- You tested repeat execution instead of assuming the pipeline was idempotent.
+That is the engineering story we should carry into Day 5.
+
+We will use the existing Gold tables for the dashboard rather than rebuilding the pipeline. Day 5 will focus on business visibility, final regression, UAT, the runbook and the technical presentation.
