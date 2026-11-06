@@ -1,0 +1,4071 @@
+{
+  "datasets": [
+    {
+      "name": "returns",
+      "displayName": "Returns",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_fact_returns",
+        "dimensions": [
+          {
+            "name": "date",
+            "expr": "DATE(return_ts)"
+          },
+          {
+            "name": "store_name",
+            "expr": "store_name"
+          },
+          {
+            "name": "region",
+            "expr": "store_region"
+          },
+          {
+            "name": "category",
+            "expr": "category"
+          },
+          {
+            "name": "product_name",
+            "expr": "product_name"
+          },
+          {
+            "name": "return_reason",
+            "expr": "return_reason"
+          },
+          {
+            "name": "inspection_status",
+            "expr": "inspection_status"
+          },
+          {
+            "name": "approved_flag",
+            "expr": "approved_flag"
+          },
+          {
+            "name": "sales_link_status",
+            "expr": "sales_link_status"
+          }
+        ],
+        "measures": [
+          {
+            "name": "return_transactions",
+            "expr": "COUNT(DISTINCT return_id)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "returned_quantity",
+            "expr": "SUM(return_quantity)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "refund_amount",
+            "expr": "SUM(refund_amount)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "sales",
+      "displayName": "Sales",
+      "config": {
+        "source": "capretailnew.gold.gold_fact_sales",
+        "measures": [
+          {
+            "name": "gross_sales",
+            "expr": "SUM(source.gross_sales)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "discount_amount",
+            "expr": "SUM(source.discount_amount)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "sales_after_discount",
+            "expr": "SUM(source.sales_after_discount_before_tax)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "tax_amount",
+            "expr": "SUM(source.tax_amount)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "sales_including_tax",
+            "expr": "SUM(source.sales_including_tax_before_refunds)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "quantity_sold",
+            "expr": "SUM(source.quantity)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "order_lines",
+            "expr": "COUNT(source.order_line_id)"
+          },
+          {
+            "name": "cost_of_goods",
+            "expr": "SUM(source.quantity * product.cost_price)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "lines_missing_cost",
+            "expr": "COUNT(1) FILTER (WHERE product.cost_price IS NULL)"
+          },
+          {
+            "name": "gross_profit",
+            "expr": "MEASURE(sales_after_discount) - MEASURE(cost_of_goods)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "gross_margin_pct",
+            "expr": "MEASURE(gross_profit) / NULLIF(MEASURE(sales_after_discount), 0)",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "dimensions": [
+          {
+            "name": "date",
+            "expr": "DATE(source.order_ts)"
+          },
+          {
+            "name": "month",
+            "expr": "DATE_TRUNC('MONTH', source.order_ts)"
+          },
+          {
+            "name": "store_name",
+            "expr": "source.store_name"
+          },
+          {
+            "name": "region",
+            "expr": "source.region"
+          },
+          {
+            "name": "category",
+            "expr": "source.category"
+          },
+          {
+            "name": "product_name",
+            "expr": "source.product_name"
+          },
+          {
+            "name": "sales_channel",
+            "expr": "source.sales_channel"
+          },
+          {
+            "name": "order_status",
+            "expr": "source.order_status"
+          }
+        ],
+        "joins": [
+          {
+            "name": "product",
+            "source": "capretailnew.gold.gold_dim_product",
+            "on": "source.product_id = product.product_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sales_vs_returns",
+      "displayName": "Sales vs Returns",
+      "config": {
+        "version": "1.1",
+        "source": "SELECT 'Sales' AS record_type, DATE(order_ts) AS date, store_name, region, category, product_name,\n       CAST(quantity AS DECIMAL(18,2)) AS qty, sales_after_discount_before_tax AS amount\nFROM capretailnew.gold.gold_fact_sales\nUNION ALL\nSELECT 'Refund' AS record_type, DATE(return_ts) AS date, store_name, store_region AS region, category, product_name,\n       return_quantity AS qty, refund_amount AS amount\nFROM capretailnew.gold.gold_fact_returns",
+        "dimensions": [
+          {
+            "name": "date",
+            "expr": "date"
+          },
+          {
+            "name": "store_name",
+            "expr": "store_name"
+          },
+          {
+            "name": "region",
+            "expr": "region"
+          },
+          {
+            "name": "category",
+            "expr": "category"
+          },
+          {
+            "name": "product_name",
+            "expr": "product_name"
+          },
+          {
+            "name": "record_type",
+            "expr": "record_type"
+          }
+        ],
+        "measures": [
+          {
+            "name": "amount",
+            "expr": "SUM(amount)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "USD",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "sold_quantity",
+            "expr": "SUM(qty) FILTER (WHERE record_type = 'Sales')"
+          },
+          {
+            "name": "returned_quantity",
+            "expr": "SUM(qty) FILTER (WHERE record_type = 'Refund')"
+          },
+          {
+            "name": "return_rate_pct",
+            "expr": "MEASURE(returned_quantity) / NULLIF(MEASURE(sold_quantity), 0)",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "inventory",
+      "displayName": "Inventory Movements",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_fact_inventory_movements",
+        "dimensions": [
+          {
+            "name": "date",
+            "expr": "movement_date"
+          },
+          {
+            "name": "store_name",
+            "expr": "store_name"
+          },
+          {
+            "name": "region",
+            "expr": "region"
+          },
+          {
+            "name": "category",
+            "expr": "category"
+          },
+          {
+            "name": "product_name",
+            "expr": "product_name"
+          },
+          {
+            "name": "movement_type",
+            "expr": "movement_type"
+          },
+          {
+            "name": "warehouse_id",
+            "expr": "warehouse_id"
+          }
+        ],
+        "measures": [
+          {
+            "name": "movement_count",
+            "expr": "COUNT(DISTINCT movement_id)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "net_quantity",
+            "expr": "SUM(quantity_change)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "absolute_quantity",
+            "expr": "SUM(ABS(quantity_change))",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "stock_inflow",
+            "expr": "SUM(quantity_change) FILTER (WHERE quantity_change > 0)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "stock_outflow",
+            "expr": "-SUM(quantity_change) FILTER (WHERE quantity_change < 0)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "cumulative_net_quantity",
+            "expr": "SUM(quantity_change)",
+            "window": [
+              {
+                "order": "date",
+                "range": "cumulative",
+                "semiadditive": "last"
+              }
+            ],
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "0d0853b6",
+      "displayName": "gold_daily_sales_summary",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_daily_sales_summary"
+      }
+    },
+    {
+      "name": "ea2f6e86",
+      "displayName": "gold_dim_product",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_dim_product"
+      }
+    },
+    {
+      "name": "303ffa7a",
+      "displayName": "gold_dim_store",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_dim_store"
+      }
+    },
+    {
+      "name": "d85f7a39",
+      "displayName": "gold_dim_supplier",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_dim_supplier",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "33402847",
+      "displayName": "gold_fact_inventory_movements",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_fact_inventory_movements"
+      }
+    },
+    {
+      "name": "d7358741",
+      "displayName": "gold_fact_returns",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_fact_returns",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "13b4314c",
+      "displayName": "gold_fact_sales",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_fact_sales"
+      }
+    },
+    {
+      "name": "4447bee9",
+      "displayName": "gold_inventory_movement_ledger",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_inventory_movement_ledger",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "f4dad4a6",
+      "displayName": "gold_store_sales_kpis",
+      "config": {
+        "version": "1.1",
+        "source": "capretailnew.gold.gold_store_sales_kpis",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "9083dcb8",
+      "displayName": "Retail Sales Performance",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_gross",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(gross_sales)",
+                      "expression": "MEASURE(`gross_sales`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Gross Sales",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(gross_sales)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_discount",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(discount_amount)",
+                      "expression": "MEASURE(`discount_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Discount Amount",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(discount_amount)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_net",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Sales After Discount",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_tax",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(tax_amount)",
+                      "expression": "MEASURE(`tax_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Tax Amount",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(tax_amount)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_incl_tax",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(sales_including_tax)",
+                      "expression": "MEASURE(`sales_including_tax`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Sales Including Tax",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(sales_including_tax)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "f_channel",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_sales_channel",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "sales_channel",
+                      "expression": "`sales_channel`"
+                    },
+                    {
+                      "name": "sales_channel_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Sales Channel"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "sales_channel",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_sales_channel"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f_status",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_order_status",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "order_status",
+                      "expression": "`order_status`"
+                    },
+                    {
+                      "name": "order_status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Order Status"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_status",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_order_status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "daily_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Daily Sales Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#1F77B4"
+                ]
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "displayName": "Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sales After Discount",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "monthly_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Monthly Sales Trend",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Data covers Jul–Aug 2026 only",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#14A3A3"
+                ],
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sales After Discount",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 8,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "sales_by_store",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    },
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Sales by Store",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#2A9DF4"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sales After Discount",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "store_name",
+                  "displayName": "Store",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 15
+                    },
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "top_products",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    },
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Top 10 Products by Sales",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#0E6E8C"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sales After Discount",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "product_name",
+                  "displayName": "Product",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 10
+                    },
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 14,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "sales_by_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    },
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Sales by Product Category",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sales After Discount"
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 21,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "sales_by_channel",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    },
+                    {
+                      "name": "sales_channel",
+                      "expression": "`sales_channel`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Sales by Sales Channel",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(sales_after_discount)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sales After Discount"
+                },
+                "color": {
+                  "fieldName": "sales_channel",
+                  "displayName": "Channel",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 21,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "qty_by_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "measure(quantity_sold)",
+                      "expression": "MEASURE(`quantity_sold`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Sales Quantity by Category"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#5BC0BE"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(quantity_sold)",
+                  "displayName": "Quantity Sold",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 21,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "store_comparison",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "measure(gross_sales)",
+                      "expression": "MEASURE(`gross_sales`)"
+                    },
+                    {
+                      "name": "measure(sales_after_discount)",
+                      "expression": "MEASURE(`sales_after_discount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Store-wise Sales Comparison",
+                "description": "Gross sales vs sales after discount per store"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#1F77B4",
+                  "#14A3A3"
+                ],
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "store_name",
+                  "axis": {
+                    "labelAngle": 45
+                  },
+                  "displayName": "Store",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 20
+                    },
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(gross_sales)",
+                      "displayName": "Gross Sales"
+                    },
+                    {
+                      "fieldName": "measure(sales_after_discount)",
+                      "displayName": "Sales After Discount"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "returns_profitability",
+      "displayName": "Returns and Product Profitability",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_ret_tx",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Total Return Transactions"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(return_transactions)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ret_qty",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(returned_quantity)",
+                      "expression": "MEASURE(`returned_quantity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Returned Quantity",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(returned_quantity)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_refund",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(refund_amount)",
+                      "expression": "MEASURE(`refund_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Refund Amount",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(refund_amount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_return_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "measure(return_rate_pct)",
+                      "expression": "MEASURE(`return_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Return Rate (%)",
+                "description": "Returned qty / sold qty"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(return_rate_pct)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_gp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(gross_profit)",
+                      "expression": "MEASURE(`gross_profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Gross Profit",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Sales after discount minus qty x product cost",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(gross_profit)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_gm",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "measure(gross_margin_pct)",
+                      "expression": "MEASURE(`gross_margin_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Gross Margin (%)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(gross_margin_pct)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 3,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "f_reason",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_return_reason",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "return_reason",
+                      "expression": "`return_reason`"
+                    },
+                    {
+                      "name": "return_reason_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Return Reason"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "return_reason",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_return_reason"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f_inspection",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_inspection_status",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "inspection_status",
+                      "expression": "`inspection_status`"
+                    },
+                    {
+                      "name": "inspection_status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Inspection Status"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "inspection_status",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_inspection_status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 6,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f_approval",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_approved_flag",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "approved_flag",
+                      "expression": "`approved_flag`"
+                    },
+                    {
+                      "name": "approved_flag_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Approval Status"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "approved_flag",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_approved_flag"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 6,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "returns_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Returns Trend Over Time"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#7B4FB8"
+                ],
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "displayName": "Return Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(return_transactions)",
+                  "displayName": "Return Transactions",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "returns_reason",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    },
+                    {
+                      "name": "return_reason",
+                      "expression": "`return_reason`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Returns by Return Reason"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#7B4FB8",
+                  "#3BAA6E",
+                  "#F28C28",
+                  "#A77BD9",
+                  "#7FCB9A",
+                  "#F7B26A"
+                ]
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(return_transactions)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Return Transactions"
+                },
+                "color": {
+                  "fieldName": "return_reason",
+                  "displayName": "Return Reason",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "returns_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Returns by Product Category"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#7B4FB8"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(return_transactions)",
+                  "displayName": "Return Transactions",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "refund_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "measure(refund_amount)",
+                      "expression": "MEASURE(`refund_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Refund Amount by Category",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#F28C28"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(refund_amount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Refund Amount",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 14,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "inspection_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    },
+                    {
+                      "name": "inspection_status",
+                      "expression": "`inspection_status`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Return Inspection Status"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#3BAA6E",
+                  "#F28C28",
+                  "#7B4FB8",
+                  "#7FCB9A",
+                  "#F7B26A"
+                ]
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(return_transactions)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Return Transactions"
+                },
+                "color": {
+                  "fieldName": "inspection_status",
+                  "displayName": "Inspection Status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 14,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "returns_store",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Returns by Store"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#3BAA6E"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "store_name",
+                  "axis": {
+                    "labelAngle": 45
+                  },
+                  "displayName": "Store",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 15
+                    },
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(return_transactions)",
+                  "displayName": "Return Transactions",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "top_returned",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(returned_quantity)",
+                      "expression": "MEASURE(`returned_quantity`)"
+                    },
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Top 10 Most Returned Products"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#7B4FB8"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(returned_quantity)",
+                  "displayName": "Returned Quantity",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "product_name",
+                  "displayName": "Product",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 10
+                    },
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 20,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "sales_vs_refund",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "record_type",
+                      "expression": "`record_type`"
+                    },
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "measure(amount)",
+                      "expression": "MEASURE(`amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Sales vs Refund Amount",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Sales after discount vs refunds by category (refunds are ~0.5% of sales)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(amount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Amount",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "record_type",
+                  "displayName": "Type",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Sales",
+                        "color": "#3BAA6E"
+                      },
+                      {
+                        "value": "Refund",
+                        "color": "#F28C28"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "approved_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "measure(return_transactions)",
+                      "expression": "MEASURE(`return_transactions`)"
+                    },
+                    {
+                      "name": "approved_flag",
+                      "expression": "`approved_flag`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Approved vs Not Approved Returns"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#3BAA6E",
+                  "#F28C28",
+                  "#7B4FB8"
+                ]
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(return_transactions)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Return Transactions"
+                },
+                "color": {
+                  "fieldName": "approved_flag",
+                  "displayName": "Approved Flag",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 27,
+            "width": 4,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "inventory_movement",
+      "displayName": "Inventory and Stock Movement",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_moves",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "measure(movement_count)",
+                      "expression": "MEASURE(`movement_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Total Inventory Movements"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(movement_count)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_inflow",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "measure(stock_inflow)",
+                      "expression": "MEASURE(`stock_inflow`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Total Stock Inflow",
+                "description": "Sum of positive quantity changes"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(stock_inflow)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_outflow",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "measure(stock_outflow)",
+                      "expression": "MEASURE(`stock_outflow`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Total Stock Outflow",
+                "description": "Sum of negative quantity changes (shown positive)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(stock_outflow)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_net",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "measure(net_quantity)",
+                      "expression": "MEASURE(`net_quantity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Net Quantity Movement",
+                "description": "Available stock not shown: no opening balance in Gold"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(net_quantity)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "f_mtype",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_movement_type",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "movement_type",
+                      "expression": "`movement_type`"
+                    },
+                    {
+                      "name": "movement_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Movement Type"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "movement_type",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_movement_type"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f_wh",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_warehouse_id",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "warehouse_id",
+                      "expression": "`warehouse_id`"
+                    },
+                    {
+                      "name": "warehouse_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Warehouse"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "warehouse_id",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_warehouse_id"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "move_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "measure(movement_count)",
+                      "expression": "MEASURE(`movement_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Inventory Movement Trend"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#14A3A3"
+                ],
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "displayName": "Movement Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(movement_count)",
+                  "displayName": "Movements",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cumulative",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "measure(cumulative_net_quantity)",
+                      "expression": "MEASURE(`cumulative_net_quantity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Cumulative Inventory Movement",
+                "description": "Running net movement, not on-hand stock"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#1F77B4"
+                ],
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "displayName": "Movement Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(cumulative_net_quantity)",
+                  "displayName": "Cumulative Net Quantity",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "qty_by_type",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "movement_type",
+                      "expression": "`movement_type`"
+                    },
+                    {
+                      "name": "measure(net_quantity)",
+                      "expression": "MEASURE(`net_quantity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Movement Quantity by Movement Type",
+                "description": "Net signed quantity change"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#E0A526"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "movement_type",
+                  "displayName": "Movement Type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(net_quantity)",
+                  "displayName": "Net Quantity",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "in_vs_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "movement_type",
+                      "expression": "`movement_type`"
+                    },
+                    {
+                      "name": "measure(stock_inflow)",
+                      "expression": "MEASURE(`stock_inflow`)"
+                    },
+                    {
+                      "name": "measure(stock_outflow)",
+                      "expression": "MEASURE(`stock_outflow`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Stock Inflow vs Outflow"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#14A3A3",
+                  "#E0A526"
+                ],
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "movement_type",
+                  "displayName": "Movement Type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(stock_inflow)",
+                      "displayName": "Stock Inflow"
+                    },
+                    {
+                      "fieldName": "measure(stock_outflow)",
+                      "displayName": "Stock Outflow"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "by_product",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "measure(movement_count)",
+                      "expression": "MEASURE(`movement_count`)"
+                    },
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Inventory Movements by Product"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#1F77B4"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(movement_count)",
+                  "displayName": "Movements",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "product_name",
+                  "displayName": "Product",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 15
+                    },
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "top_products_qty",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "measure(absolute_quantity)",
+                      "expression": "MEASURE(`absolute_quantity`)"
+                    },
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Top 10 Products by Movement Quantity",
+                "description": "Absolute quantity moved"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#E0A526"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(absolute_quantity)",
+                  "displayName": "Absolute Quantity",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "product_name",
+                  "displayName": "Product",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 10
+                    },
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 17,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "by_store",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "measure(movement_count)",
+                      "expression": "MEASURE(`movement_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Inventory Movements by Store"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#14A3A3"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "store_name",
+                  "axis": {
+                    "labelAngle": 45
+                  },
+                  "displayName": "Store",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 15
+                    },
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(movement_count)",
+                  "displayName": "Movements",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "by_warehouse",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "warehouse_id",
+                      "expression": "`warehouse_id`"
+                    },
+                    {
+                      "name": "measure(movement_count)",
+                      "expression": "MEASURE(`movement_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Inventory Movements by Warehouse",
+                "description": "Only warehouse codes exist in Gold (no warehouse names)"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#1F77B4"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "warehouse_id",
+                  "axis": {
+                    "labelAngle": 45
+                  },
+                  "displayName": "Warehouse",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 15
+                    },
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(movement_count)",
+                  "displayName": "Movements",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 24,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "g_date",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_date",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_date",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_date",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_date",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Date"
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "date",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_date"
+                  },
+                  {
+                    "fieldName": "date",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_date"
+                  },
+                  {
+                    "fieldName": "date",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_date"
+                  },
+                  {
+                    "fieldName": "date",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "g_store",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_store_name",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "store_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_store_name",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "store_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_store_name",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "store_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_store_name",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "store_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Store"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "store_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_store_name"
+                  },
+                  {
+                    "fieldName": "store_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_store_name"
+                  },
+                  {
+                    "fieldName": "store_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_store_name"
+                  },
+                  {
+                    "fieldName": "store_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_store_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "g_region",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_region",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_region",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_region",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_region",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Region"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_region"
+                  },
+                  {
+                    "fieldName": "region",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_region"
+                  },
+                  {
+                    "fieldName": "region",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_region"
+                  },
+                  {
+                    "fieldName": "region",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_region"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "g_category",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_category",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_category",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_category",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_category",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Product Category"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "category",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_category"
+                  },
+                  {
+                    "fieldName": "category",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_category"
+                  },
+                  {
+                    "fieldName": "category",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_category"
+                  },
+                  {
+                    "fieldName": "category",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_category"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "g_product",
+            "queries": [
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_product_name",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "product_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_product_name",
+                "query": {
+                  "datasetName": "returns",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "product_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_product_name",
+                "query": {
+                  "datasetName": "sales_vs_returns",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "product_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_product_name",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "product_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Product Name"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "product_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d9317cfe1b0a8c78649a84a4b16c_product_name"
+                  },
+                  {
+                    "fieldName": "product_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d93161481c3bae6119b27abcc4bf_product_name"
+                  },
+                  {
+                    "fieldName": "product_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931962e123d9f980073ec1ecad0_product_name"
+                  },
+                  {
+                    "fieldName": "product_name",
+                    "queryName": "dashboards/01f1d9312ebc198e88072867dc96fc34/datasets/01f1d931af57103ea958d7ffa26b8720_product_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#EEF2F6",
+        "dark": "#0E1A22"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FCFCFD",
+        "dark": "#16242E"
+      },
+      "widgetBorderColor": {
+        "light": "#FCFCFD",
+        "dark": "#16242E"
+      },
+      "selectionColor": {
+        "light": "#2272B4"
+      },
+      "visualizationColors": [
+        "#1F77B4",
+        "#14A3A3",
+        "#2A9DF4",
+        "#0E6E8C",
+        "#5BC0BE",
+        "#7B4FB8",
+        "#3BAA6E",
+        "#F28C28",
+        "#E0A526"
+      ],
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED",
+      "widgetCornerRadius": 8,
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#08141A",
+            "dark": "#EBEBEB"
+          }
+        },
+        "widgetTitle": {
+          "fontWeight": 600
+        }
+      }
+    },
+    "applyModeEnabled": false
+  }
+}

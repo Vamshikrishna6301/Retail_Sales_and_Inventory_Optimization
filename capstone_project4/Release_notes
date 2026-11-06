@@ -1,0 +1,257 @@
+# RETAIL SALES AND INVENTORY OPTIMIZATION
+## Project Release Notes – Version 1.0
+
+**Release:** 1.0  
+**Platform:** Microsoft Azure Databricks  
+**Architecture:** Lakehouse Architecture  
+**Project Duration:** 5 Days
+
+---
+
+## 1. Project Overview
+
+The Retail Sales and Inventory Optimization project implements an end-to-end data engineering and analytics solution using Azure Databricks.
+
+The solution integrates retail sales transactions, inventory movements, sales returns and master data into a centralized Lakehouse architecture.
+
+It transforms raw operational data into trusted business datasets and provides analytical capabilities through Databricks AI/BI Dashboards, Genie and MLflow.
+
+The primary business objectives are:
+- Improve retail sales visibility.
+- Maintain reliable inventory movement records.
+- Support sales-return analysis.
+- Reconcile stock balances and business metrics.
+- Enable interactive business intelligence.
+- Introduce AI-assisted analytics and demand forecasting.
+
+## 2. Technology Stack
+
+- Microsoft Azure
+- Azure Data Lake Storage Gen2
+- Azure SQL Database
+- Azure Databricks
+- Apache Spark / PySpark
+- Delta Lake
+- Unity Catalog
+- Auto Loader
+- Databricks Workflows
+- Databricks AI/BI Dashboards
+- Databricks Genie
+- MLflow
+- SQL
+
+## 3. Solution Architecture
+
+The project follows a Medallion Lakehouse architecture.
+
+**Source Systems**
+
+- ADLS Gen2 source files
+- Azure SQL master-data extracts
+
+**Bronze Layer**
+- Raw data ingestion.
+- Auto Loader ingestion for file-based feeds.
+- JDBC ingestion for Azure SQL master data.
+- Delta storage of ingested source data.
+
+**Silver Layer**
+- Data type standardization.
+- Data cleansing.
+- Duplicate handling.
+- Reference validation.
+- Quarantine processing.
+- Business-rule validation.
+
+**Gold Layer**
+- Curated business dimensions.
+- Fact and aggregate datasets.
+- Retail sales KPIs.
+- Business-ready analytical outputs.
+
+**Consumption Layer**
+- AI/BI dashboards.
+- Genie Agent.
+- MLflow forecasting experiment.
+
+## 4. Source Data Integration
+
+The project processes six source datasets:
+
+| Dataset | Classification | Business Key |
+|---|---|---|
+| Product Master | Master data | product_id |
+| Store Master | Master data | store_id |
+| Supplier Master | Master data | supplier_id |
+| Sales Order Lines | Transaction data | order_line_id |
+| Inventory Movements | Event data | movement_id |
+| Sales Returns | Transaction data | return_id |
+
+Master datasets are sourced through Azure SQL seed extracts. Sales and inventory feeds are ingested from ADLS, with returns handled as a supplementary transaction feed.
+
+## 5. Data Engineering Implementation
+
+### 5.1 Bronze Layer
+
+- Implemented raw data ingestion.
+- Used Auto Loader for file-based ingestion.
+- Integrated master data using JDBC.
+- Stored ingested data in Delta format.
+- Preserved source-level records for downstream processing.
+
+### 5.2 Silver Layer
+
+- Implemented standardized data transformations.
+- Applied data-quality checks.
+- Handled duplicate records.
+- Implemented quarantine processing for rejected records.
+- Processed sales, inventory movements, returns and master entities.
+
+### 5.3 Gold Layer
+
+- Created curated business datasets.
+- Implemented analytical dimensions and fact processing.
+- Developed the daily sales summary.
+- Aggregated business metrics by sales date, store and category.
+
+Confirmed Gold sales table:
+
+`capretailnew.gold.gold_daily_sales_summary`
+
+Its grain is sales date + store + category.
+
+## 6. Inventory and Returns Processing
+
+The project includes dedicated processing for:
+
+- Inventory movement events.
+- Sales return transactions.
+- Business-key relationships.
+- Inventory and return data-quality checks.
+- Stock-balance reconciliation requirements.
+- Unit-of-measure controls.
+
+Detailed inventory reconciliation outcomes should be included only where supported by the implemented Gold outputs and recorded validation evidence.
+
+## 7. Pipeline Orchestration
+
+The retail data pipeline is orchestrated using Databricks Workflows.
+
+The configured pipeline includes:
+- Bronze ingestion.
+- JDBC ingestion.
+- Inventory Silver processing.
+- Master Silver processing.
+- Sales Silver processing.
+- Returns Silver processing.
+- Gold dimension processing.
+- Gold fact processing.
+
+The latest verified workflow run completed successfully, with all visible tasks reporting Succeeded.
+
+## 8. Business Intelligence – AI/BI Dashboard
+
+A governed Retail Sales & Performance Dashboard was implemented using the approved Gold sales dataset.
+
+Dashboard features:
+- Four KPI cards.
+- Ten business visualizations.
+- Sales date, store and category filters.
+- Monthly sales trends.
+- Daily sales performance.
+- Category-wise sales analysis.
+- Store performance ranking.
+- Gross sales and net sales comparison.
+- Discount analysis.
+- Quantity and order-line analysis.
+
+## 9. Genie Agent
+
+A Genie Agent was configured over approved Gold tables to support natural-language business analysis.
+
+Three questions were validated against SQL:
+
+1. Total net sales by category.
+2. Top five stores by net sales.
+3. Monthly net sales trend.
+
+All three numerical comparisons matched the corresponding SQL results.
+
+## 10. MLflow – Daily Demand Forecasting Baseline
+
+A small daily sales forecasting baseline was developed using Gold sales features.
+
+Implementation:
+- Linear Regression model.
+- Historical sales and calendar features.
+- Chronological train/test split.
+- MLflow experiment tracking.
+- Model logging and reloading.
+- Prediction generation.
+- Evaluation using MAE, RMSE and R².
+
+The model was successfully logged and loaded, and predictions were generated for 2,746 test records.
+
+The experiment demonstrated limited predictive accuracy and is intended as a baseline extension rather than a production forecasting solution.
+
+## 11. Regression and UAT
+
+The following validation activities were completed:
+
+| Validation Area | Outcome |
+|---|---|
+| Latest pipeline execution | Passed |
+| Gold sales data validation | Passed |
+| Silver-to-Gold financial reconciliation | Minor difference identified |
+| Dashboard functionality | Passed |
+| Dashboard filters | Passed |
+| Genie-to-SQL verification | 3/3 passed |
+| MLflow model logging | Passed |
+| MLflow model loading | Passed |
+| Prediction generation | Passed |
+
+## 12. Known Issues and Limitations
+
+### Financial reconciliation
+A ₹3.13 difference was observed between Silver-derived and Gold net-sales totals. Gross sales and discounts matched exactly.
+
+### Genie citation quality
+One Genie response returned an unrelated query citation, although the numerical answer matched SQL.
+
+### Forecasting performance
+The Linear Regression baseline produced:
+- MAE: approximately 32,725.
+- RMSE: approximately 41,764.
+- R²: approximately -0.004.
+
+Further feature engineering and alternative forecasting approaches may be considered in future releases.
+
+### Data coverage
+The available sales data covers July 1 to August 25, 2026. August represents a partial reporting month.
+
+## 13. Future Enhancements
+
+Potential future improvements include:
+- More advanced demand forecasting.
+- Better inventory optimization and replenishment recommendations.
+- Enhanced stock-out analysis.
+- Improved sales-return analytics.
+- Additional business KPIs.
+- Expanded automated regression testing.
+- Improved Genie citation accuracy.
+- Forecast evaluation across multiple time windows.
+
+## 14. Release Conclusion
+
+Version 1.0 delivers an integrated retail data engineering and analytics solution built on Azure Databricks.
+
+The solution establishes a Lakehouse data-processing architecture, curated Gold analytics, business intelligence dashboards, natural-language analytics and MLflow-based forecasting experimentation.
+
+The completed implementation and validation activities provide a foundation for future retail analytics and inventory optimization improvements.
+
+**Release Version:** 1.0  
+**Release Status:** Prepared for client demonstration.
+
+---
+
+*End of Project Release Notes*
